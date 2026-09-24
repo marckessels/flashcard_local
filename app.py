@@ -2,8 +2,11 @@
 import streamlit as st
 import json, csv, io, sqlite3, math, hashlib
 from datetime import datetime, date, timedelta
+from pathlib import Path
 
 DB = "studyflash_local.db"
+DEFAULT_USER = "dochter"
+BUNDLED_PACKAGE = Path(__file__).with_name("shared_decks.json")
 
 st.set_page_config(page_title="StudyFlash Local", page_icon="📚", layout="wide")
 
@@ -15,33 +18,51 @@ def db():
 def init_db():
     c = db()
     c.execute("""CREATE TABLE IF NOT EXISTS progress(
-        deck TEXT NOT NULL, card_id TEXT NOT NULL,
+        user TEXT NOT NULL, deck TEXT NOT NULL, card_id TEXT NOT NULL,
         due TEXT NOT NULL, interval REAL NOT NULL DEFAULT 0,
         ease REAL NOT NULL DEFAULT 2.5, reps INTEGER NOT NULL DEFAULT 0,
         lapses INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY(deck, card_id))""")
+        PRIMARY KEY(user, deck, card_id))""")
+    columns = [row[1] for row in c.execute("PRAGMA table_info(progress)")]
+    if "user" not in columns:
+        c.execute("ALTER TABLE progress RENAME TO progress_legacy")
+        c.execute("""CREATE TABLE progress(
+            user TEXT NOT NULL, deck TEXT NOT NULL, card_id TEXT NOT NULL,
+            due TEXT NOT NULL, interval REAL NOT NULL DEFAULT 0,
+            ease REAL NOT NULL DEFAULT 2.5, reps INTEGER NOT NULL DEFAULT 0,
+            lapses INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(user, deck, card_id))""")
+        c.execute("""INSERT INTO progress
+            (user, deck, card_id, due, interval, ease, reps, lapses)
+            SELECT ?, deck, card_id, due, interval, ease, reps, lapses
+            FROM progress_legacy""", (DEFAULT_USER,))
+        c.execute("DROP TABLE progress_legacy")
+    c.execute("""CREATE TABLE IF NOT EXISTS shared_decks(
+        name TEXT PRIMARY KEY,
+        deck_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL)""")
     c.commit()
     return c
 
 CONN = init_db()
 
-def ensure_progress(deck, cards):
+def ensure_progress(user, deck, cards):
     for card in cards:
         cid = str(card["id"])
         CONN.execute("""INSERT OR IGNORE INTO progress
-            (deck, card_id, due, interval, ease, reps, lapses)
-            VALUES(?,?,?,?,?,?,?)""",
-            (deck, cid, date.today().isoformat(), 0, 2.5, 0, 0))
+            (user, deck, card_id, due, interval, ease, reps, lapses)
+            VALUES(?,?,?,?,?,?,?,?)""",
+            (user, deck, cid, date.today().isoformat(), 0, 2.5, 0, 0))
     CONN.commit()
 
-def get_progress(deck, cid):
-    return CONN.execute("SELECT * FROM progress WHERE deck=? AND card_id=?",
-                         (deck,cid)).fetchone()
+def get_progress(user, deck, cid):
+    return CONN.execute("SELECT * FROM progress WHERE user=? AND deck=? AND card_id=?",
+                         (user,deck,cid)).fetchone()
 
-def review(deck, card, quality):
+def review(user, deck, card, quality):
     # Lightweight SM-2-style scheduler:
     # quality: 0=again, 1=hard, 2=good, 3=easy
-    p = get_progress(deck, str(card["id"]))
+    p = get_progress(user, deck, str(card["id"]))
     ease = float(p["ease"]); interval = float(p["interval"])
     reps = int(p["reps"]); lapses = int(p["lapses"])
     if quality == 0:
@@ -65,8 +86,8 @@ def review(deck, card, quality):
             ease += 0.10
         due = date.today() + timedelta(days=interval)
     CONN.execute("""UPDATE progress SET due=?, interval=?, ease=?, reps=?, lapses=?
-                    WHERE deck=? AND card_id=?""",
-                 (due.isoformat(), interval, ease, reps, lapses, deck, str(card["id"])))
+                    WHERE user=? AND deck=? AND card_id=?""",
+                 (due.isoformat(), interval, ease, reps, lapses, user, deck, str(card["id"])))
     CONN.commit()
 
 def load_package(upload):
@@ -90,6 +111,19 @@ def load_package(upload):
 def save_package(data):
     return json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
 
+def save_shared_deck(deck_data):
+    CONN.execute("""INSERT INTO shared_decks(name, deck_json, updated_at)
+                    VALUES(?,?,?)
+                    ON CONFLICT(name) DO UPDATE SET
+                    deck_json=excluded.deck_json, updated_at=excluded.updated_at""",
+                 (deck_data["name"], json.dumps(deck_data, ensure_ascii=False),
+                  datetime.now().isoformat()))
+    CONN.commit()
+
+def save_shared_package(data):
+    for deck_data in data.get("decks", []):
+        save_shared_deck(deck_data)
+
 def cards_for(deck):
     for d in st.session_state.data["decks"]:
         if d["name"] == deck:
@@ -104,8 +138,11 @@ def current_deck():
         st.session_state.deck = names[0]
     return st.session_state.deck
 
-if "data" not in st.session_state:
-    st.session_state.data = {
+def default_package():
+    if BUNDLED_PACKAGE.exists():
+        data = json.loads(BUNDLED_PACKAGE.read_text(encoding="utf-8"))
+    else:
+        data = {
         "schema_version": 1,
         "source": {"generated_by":"ChatGPT","created":datetime.now().isoformat()},
         "decks": [{
@@ -117,7 +154,16 @@ if "data" not in st.session_state:
             ],
             "summary":"Dit is een demo. Importeer een door ChatGPT gemaakt JSON-pakket om je eigen cursus te gebruiken."
         }]
-    }
+        }
+    decks_by_name = {d["name"]: d for d in data.get("decks", [])}
+    for row in CONN.execute("SELECT deck_json FROM shared_decks"):
+        stored_deck = json.loads(row["deck_json"])
+        decks_by_name[stored_deck["name"]] = stored_deck
+    data["decks"] = list(decks_by_name.values())
+    return data
+
+if "data" not in st.session_state:
+    st.session_state.data = default_package()
 
 st.title("📚 StudyFlash Local")
 st.caption("Lokale Streamlit-leerapp geïnspireerd op Studyflash — zonder ingebouwde AI.")
@@ -125,12 +171,17 @@ st.info("AI-generatie gebeurt bewust buiten deze app: upload je lesmateriaal in 
 
 with st.sidebar:
     st.header("📦 Cursus")
+    user = st.text_input("Gebruiker", value=st.session_state.get("user", DEFAULT_USER)).strip()
+    user = user or DEFAULT_USER
+    st.session_state.user = user
+    st.caption(f"Voortgang wordt bijgehouden voor: {user}")
     up = st.file_uploader("Importeer ChatGPT-pakket", type=["json","csv"])
     if up:
         upload_key = f"{up.name}:{hashlib.sha256(up.getvalue()).hexdigest()}"
         if st.session_state.get("last_imported_upload") != upload_key:
             try:
                 imported_data = load_package(up)
+                save_shared_package(imported_data)
                 st.session_state.data = imported_data
                 names = [d["name"] for d in imported_data["decks"]]
                 st.session_state.deck = names[0] if names else None
@@ -153,13 +204,13 @@ if not deck:
     st.warning("Geen deck gevonden.")
     st.stop()
 cards = cards_for(deck)
-ensure_progress(deck, cards)
+ensure_progress(user, deck, cards)
 
 tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Quiz","📖 Samenvatting","✏️ Kaarten","📊 Voortgang"])
 
 with tabs[0]:
     d = next(x for x in st.session_state.data["decks"] if x["name"] == deck)
-    rows = [get_progress(deck,str(c["id"])) for c in cards]
+    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
     due = sum(r["due"] <= date.today().isoformat() for r in rows)
     mastered = sum(r["reps"] >= 4 and r["interval"] >= 14 for r in rows)
     a,b,c = st.columns(3)
@@ -196,10 +247,11 @@ with tabs[1]:
                     "source": "user"
                 }
                 cards.append(new_card)
-                ensure_progress(deck, [new_card])
+                ensure_progress(user, deck, [new_card])
+                save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
                 st.success("Kaart toegevoegd en ingepland.")
                 st.rerun()
-    rows = [get_progress(deck,str(c["id"])) for c in cards]
+    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
     due_cards = [c for c,r in zip(cards,rows) if r["due"] <= date.today().isoformat()]
     pool = due_cards or [c for c,r in zip(cards,rows) if r["reps"] == 0]
     if "learn_index" not in st.session_state or st.session_state.get("learn_deck") != deck:
@@ -221,7 +273,7 @@ with tabs[1]:
             labels = [("Again",0),("Hard",1),("Good",2),("Easy",3)]
             for col,(lab,q) in zip(cols,labels):
                 if col.button(lab, use_container_width=True):
-                    review(deck, card, q)
+                    review(user, deck, card, q)
                     st.session_state.learn_index += 1
                     st.session_state.show_answer = False
                     st.rerun()
@@ -281,8 +333,17 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("Kaarten beheren")
 
+    st.markdown("#### Kaartenoverzicht")
+    st.dataframe(
+        [{"Voorkant": card.get("front", ""), "Achterkant": card.get("back", "")}
+         for card in cards],
+        use_container_width=True,
+        hide_index=True,
+        height=min(38 + 35 * max(len(cards), 1), 700)
+    )
+
     # User-created cards
-    with st.expander("➕ Nieuwe kaart maken", expanded=True):
+    with st.expander("➕ Nieuwe kaart maken"):
         new_front = st.text_input("Voorkant / vraag", key="new_front")
         new_back = st.text_area("Achterkant / antwoord", key="new_back")
         new_tags = st.text_input("Tags (komma's)", key="new_tags")
@@ -303,33 +364,35 @@ with tabs[4]:
                     "tags": [x.strip() for x in new_tags.split(",") if x.strip()],
                     "source": "user"
                 })
-                ensure_progress(deck, [cards[-1]])
+                ensure_progress(user, deck, [cards[-1]])
+                save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
                 st.success("Kaart toegevoegd.")
                 st.rerun()
 
-    st.divider()
-
     # Edit/delete existing cards
-    for idx,card in enumerate(cards):
-        with st.expander(f"{idx+1}. {card['front']}"):
-            f = st.text_input("Voorkant", card["front"], key=f"f{deck}{idx}")
-            b = st.text_area("Achterkant", card["back"], key=f"b{deck}{idx}")
-            tags = st.text_input("Tags (komma's)", ", ".join(card.get("tags",[])), key=f"t{deck}{idx}")
-            c1, c2 = st.columns(2)
-            if c1.button("Opslaan", key=f"s{deck}{idx}"):
-                card["front"], card["back"] = f,b
-                card["tags"] = [x.strip() for x in tags.split(",") if x.strip()]
-                st.success("Opgeslagen.")
-            if c2.button("🗑️ Verwijderen", key=f"d{deck}{idx}"):
-                cid = str(card["id"])
-                cards.pop(idx)
-                CONN.execute("DELETE FROM progress WHERE deck=? AND card_id=?", (deck, cid))
-                CONN.commit()
-                st.rerun()
+    with st.expander("✏️ Kaarten bewerken of verwijderen"):
+        for idx,card in enumerate(cards):
+            with st.expander(f"{idx+1}. {card['front']}"):
+                f = st.text_input("Voorkant", card["front"], key=f"f{deck}{idx}")
+                b = st.text_area("Achterkant", card["back"], key=f"b{deck}{idx}")
+                tags = st.text_input("Tags (komma's)", ", ".join(card.get("tags",[])), key=f"t{deck}{idx}")
+                c1, c2 = st.columns(2)
+                if c1.button("Opslaan", key=f"s{deck}{idx}"):
+                    card["front"], card["back"] = f,b
+                    card["tags"] = [x.strip() for x in tags.split(",") if x.strip()]
+                    save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
+                    st.success("Opgeslagen.")
+                if c2.button("🗑️ Verwijderen", key=f"d{deck}{idx}"):
+                    cid = str(card["id"])
+                    cards.pop(idx)
+                    CONN.execute("DELETE FROM progress WHERE user=? AND deck=? AND card_id=?", (user, deck, cid))
+                    CONN.commit()
+                    save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
+                    st.rerun()
 
 with tabs[5]:
     st.subheader("Voortgang")
-    rows = [get_progress(deck,str(c["id"])) for c in cards]
+    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
     if rows:
         mastered = sum(r["reps"] >= 4 and r["interval"] >= 14 for r in rows)
         learning = sum(r["reps"] > 0 and not (r["reps"] >= 4 and r["interval"] >= 14) for r in rows)

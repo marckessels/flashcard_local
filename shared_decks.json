@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "source": {"generated_by": "ChatGPT", "description": "Gedeelde kaartdecks"},
+  "decks": [
+    {
+      "name": "Latijn - Castor et Pollux 6",
+      "description": "Latijnse woordjes met Nederlandse vertaling",
+      "summary": "24 woordparen uit hoofdstuk 6.",
+      "cards": [
+        {"id": "cep6-001", "front": "amare", "back": "houden van, liefhebben", "tags": ["Latijn"]},
+        {"id": "cep6-002", "front": "bellum", "back": "oorlog", "tags": ["Latijn"]},
+        {"id": "cep6-003", "front": "celebrare", "back": "(feest)vieren", "tags": ["Latijn"]},
+        {"id": "cep6-004", "front": "cupere, cupio", "back": "graag willen, verlangen", "tags": ["Latijn"]},
+        {"id": "cep6-005", "front": "dux, duces", "back": "aanvoerder, leider", "tags": ["Latijn"]},
+        {"id": "cep6-006", "front": "equus", "back": "paard", "tags": ["Latijn"]},
+        {"id": "cep6-007", "front": "exspectare", "back": "wachten (op), verwachten", "tags": ["Latijn"]},
+        {"id": "cep6-008", "front": "forum", "back": "forum, marktplaats", "tags": ["Latijn"]},
+        {"id": "cep6-009", "front": "fugere, fugio", "back": "vluchten", "tags": ["Latijn"]},
+        {"id": "cep6-010", "front": "gerere", "back": "1 dragen; 2 voeren", "tags": ["Latijn"]},
+        {"id": "cep6-011", "front": "interea", "back": "intussen", "tags": ["Latijn"]},
+        {"id": "cep6-012", "front": "narrare", "back": "vertellen", "tags": ["Latijn"]},
+        {"id": "cep6-013", "front": "num", "back": "(toch) zeker niet", "tags": ["Latijn"]},
+        {"id": "cep6-014", "front": "pro + abl", "back": "1 voor; 2 in plaats van", "tags": ["Latijn"]},
+        {"id": "cep6-015", "front": "prope + acc", "back": "dichtbij", "tags": ["Latijn"]},
+        {"id": "cep6-016", "front": "pugna", "back": "gevecht", "tags": ["Latijn"]},
+        {"id": "cep6-017", "front": "pugnare", "back": "vechten", "tags": ["Latijn"]},
+        {"id": "cep6-018", "front": "scilicet", "back": "natuurlijk", "tags": ["Latijn"]},
+        {"id": "cep6-019", "front": "sedere", "back": "zitten", "tags": ["Latijn"]},
+        {"id": "cep6-020", "front": "templum", "back": "tempel", "tags": ["Latijn"]},
+        {"id": "cep6-021", "front": "vendere", "back": "verkopen", "tags": ["Latijn"]},
+        {"id": "cep6-022", "front": "victoria", "back": "overwinning", "tags": ["Latijn"]},
+        {"id": "cep6-023", "front": "vincere", "back": "(over)winnen", "tags": ["Latijn"]},
+        {"id": "cep6-024", "front": "vita", "back": "(het) leven", "tags": ["Latijn"]}
+      ]
+    }
+  ]
+}
