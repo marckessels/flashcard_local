@@ -11,6 +11,39 @@ BUNDLED_PACKAGE = Path(__file__).with_name("shared_decks.json")
 
 st.set_page_config(page_title="StudyFlash Local", page_icon="📚", layout="wide")
 
+st.markdown("""
+<style>
+.studyflash-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0 0 0.8rem 0;
+}
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-top: 0.75rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .studyflash-title {
+        font-size: 1.45rem;
+        margin-bottom: 0.35rem;
+    }
+    div[data-baseweb="tab-list"] {
+        gap: 0.1rem;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    div[data-baseweb="tab-list"] button {
+        min-width: max-content;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    h3 { font-size: 1.25rem !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+
 def db():
     c = sqlite3.connect(DB, check_same_thread=False)
     c.row_factory = sqlite3.Row
@@ -194,12 +227,13 @@ def default_package():
 if "data" not in st.session_state:
     st.session_state.data = default_package()
 
-st.title("📚 StudyFlash Local")
-st.caption("Lokale Streamlit-leerapp geïnspireerd op Studyflash — zonder ingebouwde AI.")
-st.info("AI-generatie gebeurt bewust buiten deze app: upload je lesmateriaal in ChatGPT, laat ChatGPT een StudyFlash JSON-pakket maken en importeer dat hier.")
+st.markdown('<div class="studyflash-title">📚 StudyFlash</div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("📦 Cursus")
+    with st.expander("ℹ️ Over deze app"):
+        st.caption("Lokale Streamlit-leerapp zonder ingebouwde AI.")
+        st.write("Upload lesmateriaal als StudyFlash JSON- of CSV-pakket via de knop hieronder.")
     user = st.text_input("Gebruiker", value=st.session_state.get("user", DEFAULT_USER)).strip()
     user = user or DEFAULT_USER
     st.session_state.user = user
