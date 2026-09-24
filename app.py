@@ -151,7 +151,7 @@ def enable_keyboard_shortcuts():
     };
     host.addEventListener('keydown', host.__studyflashKeyHandler);
     </script>
-    """, height=0)
+    """, height=1)
 
 def load_package(upload):
     raw = upload.getvalue()
@@ -371,6 +371,8 @@ with tabs[1]:
                 st.session_state.show_answer = True
                 st.rerun()
 
+    enable_keyboard_shortcuts()
+
 with tabs[2]:
     st.subheader("Stampen")
     ensure_stamp_progress(user, deck, cards)
@@ -506,8 +508,6 @@ with tabs[5]:
             "ease": round(r["ease"],2),
             "volgende": r["due"]
         } for c,r in zip(cards,rows)], use_container_width=True, hide_index=True)
-
-enable_keyboard_shortcuts()
 
 st.divider()
 st.caption("StudyFlash Local is een onafhankelijke hobby-/prototype-app en niet verbonden aan Studyflash GmbH.")
