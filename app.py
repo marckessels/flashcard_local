@@ -1,5 +1,6 @@
 
 import streamlit as st
+import streamlit.components.v1 as components
 import json, csv, io, sqlite3, math, hashlib, random
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -117,6 +118,40 @@ def mark_stamp(user, deck, card_id, correct):
 def reset_stamp(user, deck):
     CONN.execute("UPDATE stamp_progress SET correct=0 WHERE user=? AND deck=?", (user, deck))
     CONN.commit()
+
+def enable_keyboard_shortcuts():
+    components.html("""
+    <script>
+    const host = window.parent;
+    if (host.__studyflashKeyHandler) {
+      host.removeEventListener('keydown', host.__studyflashKeyHandler);
+    }
+    host.__studyflashKeyHandler = (event) => {
+      const active = host.document.activeElement;
+      const tag = active && active.tagName ? active.tagName.toLowerCase() : '';
+      if (['input', 'textarea', 'select'].includes(tag) || (active && active.isContentEditable)) return;
+
+      const labels = {
+        'Space': ['Toon antwoord', 'Toon modelantwoord'],
+        'KeyZ': ['Again'],
+        'KeyX': ['Hard'],
+        'KeyC': ['Good'],
+        'KeyV': ['Easy']
+      };
+      const wanted = labels[event.code];
+      if (!wanted) return;
+      const button = [...host.document.querySelectorAll('button')].find((candidate) => {
+        const text = candidate.innerText.trim();
+        return wanted.includes(text) && candidate.offsetParent !== null && !candidate.disabled;
+      });
+      if (button) {
+        event.preventDefault();
+        button.click();
+      }
+    };
+    host.addEventListener('keydown', host.__studyflashKeyHandler);
+    </script>
+    """, height=0)
 
 def load_package(upload):
     raw = upload.getvalue()
@@ -307,7 +342,7 @@ with tabs[1]:
         if st.session_state.show_answer:
             st.markdown("---")
             st.markdown(card["back"])
-            st.caption("Hoe goed wist je dit?")
+            st.caption("Toetsen: Z = Again · X = Hard · C = Good · V = Easy")
             cols = st.columns(4)
             labels = [("Again",0),("Hard",1),("Good",2),("Easy",3)]
             for col,(lab,q) in zip(cols,labels):
@@ -331,6 +366,7 @@ with tabs[1]:
                     st.session_state.show_answer = False
                     st.rerun()
         else:
+            st.caption("Druk op de spatiebalk om het antwoord te tonen.")
             if st.button("Toon antwoord", type="primary", use_container_width=True):
                 st.session_state.show_answer = True
                 st.rerun()
@@ -364,6 +400,7 @@ with tabs[2]:
         st.write(f"Nog {len(remaining_ids)} van {len(cards)} kaarten te gaan")
         st.markdown(f"### {q['front']}")
         if not st.session_state.get("stamp_reveal",False):
+            st.caption("Druk op de spatiebalk om het antwoord te tonen.")
             if st.button("Toon modelantwoord", type="primary"):
                 st.session_state.stamp_reveal = True
                 st.rerun()
@@ -469,6 +506,8 @@ with tabs[5]:
             "ease": round(r["ease"],2),
             "volgende": r["due"]
         } for c,r in zip(cards,rows)], use_container_width=True, hide_index=True)
+
+enable_keyboard_shortcuts()
 
 st.divider()
 st.caption("StudyFlash Local is een onafhankelijke hobby-/prototype-app en niet verbonden aan Studyflash GmbH.")
