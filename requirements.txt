@@ -1,1 +1,2 @@
 streamlit>=1.40
+streamlit-hotkeys==0.6.0

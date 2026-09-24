@@ -1,6 +1,6 @@
 
 import streamlit as st
-import streamlit.components.v1 as components
+import streamlit_hotkeys as hotkeys
 import json, csv, io, sqlite3, math, hashlib, random
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -118,40 +118,6 @@ def mark_stamp(user, deck, card_id, correct):
 def reset_stamp(user, deck):
     CONN.execute("UPDATE stamp_progress SET correct=0 WHERE user=? AND deck=?", (user, deck))
     CONN.commit()
-
-def enable_keyboard_shortcuts():
-    components.html("""
-    <script>
-    const host = window.parent;
-    if (host.__studyflashKeyHandler) {
-      host.removeEventListener('keydown', host.__studyflashKeyHandler);
-    }
-    host.__studyflashKeyHandler = (event) => {
-      const active = host.document.activeElement;
-      const tag = active && active.tagName ? active.tagName.toLowerCase() : '';
-      if (['input', 'textarea', 'select'].includes(tag) || (active && active.isContentEditable)) return;
-
-      const labels = {
-        'Space': ['Toon antwoord', 'Toon modelantwoord'],
-        'KeyZ': ['Again'],
-        'KeyX': ['Hard'],
-        'KeyC': ['Good'],
-        'KeyV': ['Easy']
-      };
-      const wanted = labels[event.code];
-      if (!wanted) return;
-      const button = [...host.document.querySelectorAll('button')].find((candidate) => {
-        const text = candidate.innerText.trim();
-        return wanted.includes(text) && candidate.offsetParent !== null && !candidate.disabled;
-      });
-      if (button) {
-        event.preventDefault();
-        button.click();
-      }
-    };
-    host.addEventListener('keydown', host.__studyflashKeyHandler);
-    </script>
-    """, height=1)
 
 def load_package(upload):
     raw = upload.getvalue()
@@ -287,6 +253,18 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Flashcards")
 
+    hotkeys.activate([
+        hotkeys.hk("flip", code="Space", prevent_default=True),
+        hotkeys.hk("again", code="KeyZ", prevent_default=True),
+        hotkeys.hk("hard", code="KeyX", prevent_default=True),
+        hotkeys.hk("good", code="KeyC", prevent_default=True),
+        hotkeys.hk("easy", code="KeyV", prevent_default=True),
+    ], key="learning_keys")
+    flip_pressed = hotkeys.pressed("flip", key="learning_keys")
+    pressed_quality = next((quality for shortcut, quality in
+                            [("again", 0), ("hard", 1), ("good", 2), ("easy", 3)]
+                            if hotkeys.pressed(shortcut, key="learning_keys")), None)
+
     # Quick-add card while studying
     with st.expander("➕ Kaart toevoegen tijdens het leren"):
         quick_front = st.text_input("Vraag / voorkant", key="quick_front")
@@ -346,7 +324,7 @@ with tabs[1]:
             cols = st.columns(4)
             labels = [("Again",0),("Hard",1),("Good",2),("Easy",3)]
             for col,(lab,q) in zip(cols,labels):
-                if col.button(lab, use_container_width=True):
+                if col.button(lab, use_container_width=True) or pressed_quality == q:
                     review(user, deck, card, q)
                     queue.pop(0)
                     if q <= 1:
@@ -367,11 +345,9 @@ with tabs[1]:
                     st.rerun()
         else:
             st.caption("Druk op de spatiebalk om het antwoord te tonen.")
-            if st.button("Toon antwoord", type="primary", use_container_width=True):
+            if st.button("Toon antwoord", type="primary", use_container_width=True) or flip_pressed:
                 st.session_state.show_answer = True
                 st.rerun()
-
-    enable_keyboard_shortcuts()
 
 with tabs[2]:
     st.subheader("Stampen")
