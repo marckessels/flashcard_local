@@ -1,6 +1,6 @@
 
 import streamlit as st
-import json, csv, io, sqlite3, math, hashlib
+import json, csv, io, sqlite3, math, hashlib, random
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
@@ -21,7 +21,7 @@ def init_db():
         user TEXT NOT NULL, deck TEXT NOT NULL, card_id TEXT NOT NULL,
         due TEXT NOT NULL, interval REAL NOT NULL DEFAULT 0,
         ease REAL NOT NULL DEFAULT 2.5, reps INTEGER NOT NULL DEFAULT 0,
-        lapses INTEGER NOT NULL DEFAULT 0,
+        lapses INTEGER NOT NULL DEFAULT 0, last_quality INTEGER,
         PRIMARY KEY(user, deck, card_id))""")
     columns = [row[1] for row in c.execute("PRAGMA table_info(progress)")]
     if "user" not in columns:
@@ -30,17 +30,24 @@ def init_db():
             user TEXT NOT NULL, deck TEXT NOT NULL, card_id TEXT NOT NULL,
             due TEXT NOT NULL, interval REAL NOT NULL DEFAULT 0,
             ease REAL NOT NULL DEFAULT 2.5, reps INTEGER NOT NULL DEFAULT 0,
-            lapses INTEGER NOT NULL DEFAULT 0,
+            lapses INTEGER NOT NULL DEFAULT 0, last_quality INTEGER,
             PRIMARY KEY(user, deck, card_id))""")
         c.execute("""INSERT INTO progress
             (user, deck, card_id, due, interval, ease, reps, lapses)
             SELECT ?, deck, card_id, due, interval, ease, reps, lapses
             FROM progress_legacy""", (DEFAULT_USER,))
         c.execute("DROP TABLE progress_legacy")
+    columns = [row[1] for row in c.execute("PRAGMA table_info(progress)")]
+    if "last_quality" not in columns:
+        c.execute("ALTER TABLE progress ADD COLUMN last_quality INTEGER")
     c.execute("""CREATE TABLE IF NOT EXISTS shared_decks(
         name TEXT PRIMARY KEY,
         deck_json TEXT NOT NULL,
         updated_at TEXT NOT NULL)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS stamp_progress(
+        user TEXT NOT NULL, deck TEXT NOT NULL, card_id TEXT NOT NULL,
+        correct INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(user, deck, card_id))""")
     c.commit()
     return c
 
@@ -50,9 +57,9 @@ def ensure_progress(user, deck, cards):
     for card in cards:
         cid = str(card["id"])
         CONN.execute("""INSERT OR IGNORE INTO progress
-            (user, deck, card_id, due, interval, ease, reps, lapses)
-            VALUES(?,?,?,?,?,?,?,?)""",
-            (user, deck, cid, date.today().isoformat(), 0, 2.5, 0, 0))
+            (user, deck, card_id, due, interval, ease, reps, lapses, last_quality)
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (user, deck, cid, date.today().isoformat(), 0, 2.5, 0, 0, None))
     CONN.commit()
 
 def get_progress(user, deck, cid):
@@ -84,10 +91,31 @@ def review(user, deck, card, quality):
             ease = max(1.3, ease - 0.15)
         elif quality == 3:
             ease += 0.10
-        due = date.today() + timedelta(days=interval)
-    CONN.execute("""UPDATE progress SET due=?, interval=?, ease=?, reps=?, lapses=?
+        due = date.today() if quality == 1 else date.today() + timedelta(days=interval)
+    CONN.execute("""UPDATE progress SET due=?, interval=?, ease=?, reps=?, lapses=?, last_quality=?
                     WHERE user=? AND deck=? AND card_id=?""",
-                 (due.isoformat(), interval, ease, reps, lapses, user, deck, str(card["id"])))
+                 (due.isoformat(), interval, ease, reps, lapses, quality,
+                  user, deck, str(card["id"])))
+    CONN.commit()
+
+def ensure_stamp_progress(user, deck, cards):
+    for card in cards:
+        CONN.execute("""INSERT OR IGNORE INTO stamp_progress(user, deck, card_id, correct)
+                        VALUES(?,?,?,0)""", (user, deck, str(card["id"])))
+    CONN.commit()
+
+def remaining_stamp_ids(user, deck):
+    return [row["card_id"] for row in CONN.execute(
+        "SELECT card_id FROM stamp_progress WHERE user=? AND deck=? AND correct=0",
+        (user, deck))]
+
+def mark_stamp(user, deck, card_id, correct):
+    CONN.execute("UPDATE stamp_progress SET correct=? WHERE user=? AND deck=? AND card_id=?",
+                 (1 if correct else 0, user, deck, str(card_id)))
+    CONN.commit()
+
+def reset_stamp(user, deck):
+    CONN.execute("UPDATE stamp_progress SET correct=0 WHERE user=? AND deck=?", (user, deck))
     CONN.commit()
 
 def load_package(upload):
@@ -206,7 +234,7 @@ if not deck:
 cards = cards_for(deck)
 ensure_progress(user, deck, cards)
 
-tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Quiz","📖 Samenvatting","✏️ Kaarten","📊 Voortgang"])
+tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Stampen","📖 Samenvatting","✏️ Kaarten","📊 Voortgang"])
 
 with tabs[0]:
     d = next(x for x in st.session_state.data["decks"] if x["name"] == deck)
@@ -252,18 +280,29 @@ with tabs[1]:
                 st.success("Kaart toegevoegd en ingepland.")
                 st.rerun()
     rows = [get_progress(user,deck,str(c["id"])) for c in cards]
-    due_cards = [c for c,r in zip(cards,rows) if r["due"] <= date.today().isoformat()]
-    pool = due_cards or [c for c,r in zip(cards,rows) if r["reps"] == 0]
-    if "learn_index" not in st.session_state or st.session_state.get("learn_deck") != deck:
-        st.session_state.learn_index = 0
-        st.session_state.learn_deck = deck
+    learn_marker = f"{user}:{deck}"
+    if st.session_state.get("learn_marker") != learn_marker:
+        due_ids = [str(c["id"]) for c,r in zip(cards,rows)
+                   if r["due"] <= date.today().isoformat()]
+        random.shuffle(due_ids)
+        st.session_state.learn_queue = due_ids
+        st.session_state.learn_marker = learn_marker
         st.session_state.show_answer = False
-    if not pool:
-        st.success("🎉 Geen kaarten meer gepland voor vandaag.")
+    valid_ids = {str(c["id"]) for c in cards}
+    queue = [cid for cid in st.session_state.get("learn_queue", []) if cid in valid_ids]
+    st.session_state.learn_queue = queue
+    if not queue:
+        st.success("🎉 Leerronde klaar: alle woorden zijn met Good of Easy afgerond.")
+        if st.button("Nieuwe leerronde met alle woorden"):
+            new_queue = [str(c["id"]) for c in cards]
+            random.shuffle(new_queue)
+            st.session_state.learn_queue = new_queue
+            st.session_state.show_answer = False
+            st.rerun()
     else:
-        i = st.session_state.learn_index % len(pool)
-        card = pool[i]
-        st.progress((i)/max(1,len(pool)))
+        card_by_id = {str(c["id"]): c for c in cards}
+        card = card_by_id[queue[0]]
+        st.caption(f"Nog {len(set(queue))} actieve woorden")
         st.markdown(f"### {card['front']}")
         if st.session_state.show_answer:
             st.markdown("---")
@@ -274,7 +313,21 @@ with tabs[1]:
             for col,(lab,q) in zip(cols,labels):
                 if col.button(lab, use_container_width=True):
                     review(user, deck, card, q)
-                    st.session_state.learn_index += 1
+                    queue.pop(0)
+                    if q <= 1:
+                        difficult_ids = [str(c["id"]) for c in cards
+                                         if (p := get_progress(user, deck, str(c["id"])))
+                                         and p["due"] <= date.today().isoformat()
+                                         and p["last_quality"] in (None, 0, 1)]
+                        if 0 < len(difficult_ids) <= 4:
+                            good_ids = [str(c["id"]) for c in cards
+                                        if (p := get_progress(user, deck, str(c["id"])))
+                                        and p["last_quality"] in (2, 3)
+                                        and str(c["id"]) not in queue]
+                            if good_ids:
+                                queue.insert(0, random.choice(good_ids))
+                        queue.append(str(card["id"]))
+                    st.session_state.learn_queue = queue
                     st.session_state.show_answer = False
                     st.rerun()
         else:
@@ -283,42 +336,51 @@ with tabs[1]:
                 st.rerun()
 
 with tabs[2]:
-    st.subheader("Quiz")
-    if "quiz" not in st.session_state or st.session_state.get("quiz_deck") != deck:
-        import random
-        qcards = cards[:]
-        random.shuffle(qcards)
-        st.session_state.quiz = qcards[:min(10,len(qcards))]
-        st.session_state.quiz_i = 0
-        st.session_state.quiz_score = 0
-        st.session_state.quiz_deck = deck
-    qs = st.session_state.quiz
-    qi = st.session_state.quiz_i
-    if qi >= len(qs):
-        st.success(f"Quiz klaar: {st.session_state.quiz_score}/{len(qs)} goed.")
-        if st.button("Nieuwe quiz"):
-            del st.session_state.quiz
+    st.subheader("Stampen")
+    ensure_stamp_progress(user, deck, cards)
+    stamp_marker = f"{user}:{deck}"
+    if st.session_state.get("stamp_marker") != stamp_marker:
+        stamp_queue = remaining_stamp_ids(user, deck)
+        random.shuffle(stamp_queue)
+        st.session_state.stamp_queue = stamp_queue
+        st.session_state.stamp_marker = stamp_marker
+        st.session_state.stamp_reveal = False
+    valid_stamp_ids = {str(c["id"]) for c in cards}
+    remaining_ids = set(remaining_stamp_ids(user, deck)) & valid_stamp_ids
+    stamp_queue = [cid for cid in st.session_state.get("stamp_queue", []) if cid in remaining_ids]
+    for cid in remaining_ids:
+        if cid not in stamp_queue:
+            stamp_queue.append(cid)
+    st.session_state.stamp_queue = stamp_queue
+    if not stamp_queue:
+        st.success(f"🎉 Stampen klaar: alle {len(cards)} kaarten zijn juist beantwoord.")
+        if st.button("Opnieuw stampen"):
+            reset_stamp(user, deck)
+            st.session_state.stamp_marker = None
             st.rerun()
-    elif qs:
-        q = qs[qi]
-        st.write(f"Vraag {qi+1} van {len(qs)}")
+    else:
+        card_by_id = {str(c["id"]): c for c in cards}
+        q = card_by_id[stamp_queue[0]]
+        st.write(f"Nog {len(remaining_ids)} van {len(cards)} kaarten te gaan")
         st.markdown(f"### {q['front']}")
-        # Self-assessment quiz: answer is hidden until reveal.
-        if not st.session_state.get("quiz_reveal",False):
+        if not st.session_state.get("stamp_reveal",False):
             if st.button("Toon modelantwoord", type="primary"):
-                st.session_state.quiz_reveal = True
+                st.session_state.stamp_reveal = True
                 st.rerun()
         else:
             st.info(q["back"])
             x,y = st.columns(2)
-            if x.button("✓ Ik had het goed"):
-                st.session_state.quiz_score += 1
-                st.session_state.quiz_i += 1
-                st.session_state.quiz_reveal = False
+            if x.button("✓ Juist"):
+                mark_stamp(user, deck, q["id"], True)
+                stamp_queue.pop(0)
+                st.session_state.stamp_queue = stamp_queue
+                st.session_state.stamp_reveal = False
                 st.rerun()
-            if y.button("✗ Ik had het fout"):
-                st.session_state.quiz_i += 1
-                st.session_state.quiz_reveal = False
+            if y.button("✗ Fout"):
+                mark_stamp(user, deck, q["id"], False)
+                stamp_queue.append(stamp_queue.pop(0))
+                st.session_state.stamp_queue = stamp_queue
+                st.session_state.stamp_reveal = False
                 st.rerun()
 
 with tabs[3]:
@@ -386,6 +448,7 @@ with tabs[4]:
                     cid = str(card["id"])
                     cards.pop(idx)
                     CONN.execute("DELETE FROM progress WHERE user=? AND deck=? AND card_id=?", (user, deck, cid))
+                    CONN.execute("DELETE FROM stamp_progress WHERE deck=? AND card_id=?", (deck, cid))
                     CONN.commit()
                     save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
                     st.rerun()
