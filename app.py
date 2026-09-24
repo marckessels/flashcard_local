@@ -1,6 +1,6 @@
 
 import streamlit as st
-import json, csv, io, sqlite3, math
+import json, csv, io, sqlite3, math, hashlib
 from datetime import datetime, date, timedelta
 
 DB = "studyflash_local.db"
@@ -127,12 +127,17 @@ with st.sidebar:
     st.header("📦 Cursus")
     up = st.file_uploader("Importeer ChatGPT-pakket", type=["json","csv"])
     if up:
-        try:
-            st.session_state.data = load_package(up)
-            st.success("Pakket geïmporteerd.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Import mislukt: {e}")
+        upload_key = f"{up.name}:{hashlib.sha256(up.getvalue()).hexdigest()}"
+        if st.session_state.get("last_imported_upload") != upload_key:
+            try:
+                imported_data = load_package(up)
+                st.session_state.data = imported_data
+                names = [d["name"] for d in imported_data["decks"]]
+                st.session_state.deck = names[0] if names else None
+                st.session_state.last_imported_upload = upload_key
+                st.success("Pakket geïmporteerd.")
+            except Exception as e:
+                st.error(f"Import mislukt: {e}")
     deck = current_deck()
     if deck:
         st.session_state.deck = st.selectbox("Deck", [d["name"] for d in st.session_state.data["decks"]],
