@@ -26,8 +26,7 @@ st.markdown("""
         padding-right: 0.75rem !important;
     }
     .studyflash-title {
-        font-size: 1.45rem;
-        margin-bottom: 0.35rem;
+        display: none;
     }
     div[data-baseweb="tab-list"] {
         gap: 0.1rem;
@@ -285,8 +284,6 @@ with tabs[0]:
     st.caption("Plan: eerst kaarten met due=today; daarna nieuwe kaarten. Het schema gebruikt een eenvoudige SM-2-achtige herhalingslogica.")
 
 with tabs[1]:
-    st.subheader("Flashcards")
-
     hotkeys.activate([
         hotkeys.hk("flip", code="Space", prevent_default=True),
         hotkeys.hk("again", code="KeyZ", prevent_default=True),
@@ -299,33 +296,6 @@ with tabs[1]:
                             [("again", 0), ("hard", 1), ("good", 2), ("easy", 3)]
                             if hotkeys.pressed(shortcut, key="learning_keys")), None)
 
-    # Quick-add card while studying
-    with st.expander("➕ Kaart toevoegen tijdens het leren"):
-        quick_front = st.text_input("Vraag / voorkant", key="quick_front")
-        quick_back = st.text_area("Antwoord / achterkant", key="quick_back")
-        quick_tags = st.text_input("Tags (komma's)", key="quick_tags")
-        if st.button("Toevoegen en verder leren", type="primary", key="quick_add"):
-            if not quick_front.strip() or not quick_back.strip():
-                st.error("Vul zowel de vraag als het antwoord in.")
-            else:
-                ids = {str(c["id"]) for c in cards}
-                n = 1
-                cid = f"user-{n}"
-                while cid in ids:
-                    n += 1
-                    cid = f"user-{n}"
-                new_card = {
-                    "id": cid,
-                    "front": quick_front.strip(),
-                    "back": quick_back.strip(),
-                    "tags": [x.strip() for x in quick_tags.split(",") if x.strip()],
-                    "source": "user"
-                }
-                cards.append(new_card)
-                ensure_progress(user, deck, [new_card])
-                save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
-                st.success("Kaart toegevoegd en ingepland.")
-                st.rerun()
     rows = [get_progress(user,deck,str(c["id"])) for c in cards]
     learn_marker = f"{user}:{deck}"
     if st.session_state.get("learn_marker") != learn_marker:
@@ -381,6 +351,34 @@ with tabs[1]:
             st.caption("Druk op de spatiebalk om het antwoord te tonen.")
             if st.button("Toon antwoord", type="primary", use_container_width=True) or flip_pressed:
                 st.session_state.show_answer = True
+                st.rerun()
+
+    # Less prominent below the active card, especially on mobile.
+    with st.expander("➕ Kaart toevoegen tijdens het leren"):
+        quick_front = st.text_input("Vraag / voorkant", key="quick_front")
+        quick_back = st.text_area("Antwoord / achterkant", key="quick_back")
+        quick_tags = st.text_input("Tags (komma's)", key="quick_tags")
+        if st.button("Toevoegen en verder leren", type="primary", key="quick_add"):
+            if not quick_front.strip() or not quick_back.strip():
+                st.error("Vul zowel de vraag als het antwoord in.")
+            else:
+                ids = {str(c["id"]) for c in cards}
+                n = 1
+                cid = f"user-{n}"
+                while cid in ids:
+                    n += 1
+                    cid = f"user-{n}"
+                new_card = {
+                    "id": cid,
+                    "front": quick_front.strip(),
+                    "back": quick_back.strip(),
+                    "tags": [x.strip() for x in quick_tags.split(",") if x.strip()],
+                    "source": "user"
+                }
+                cards.append(new_card)
+                ensure_progress(user, deck, [new_card])
+                save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
+                st.success("Kaart toegevoegd en ingepland.")
                 st.rerun()
 
 with tabs[2]:
