@@ -2,10 +2,11 @@
 import streamlit as st
 import streamlit_hotkeys as hotkeys
 import json, csv, io, sqlite3, math, hashlib, random
+import uuid
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
-DB = "studyflash_local.db"
+DB = str(Path(__file__).with_name("studyflash_local.db"))
 DEFAULT_USER = "dochter"
 BUNDLED_PACKAGE = Path(__file__).with_name("shared_decks.json")
 
@@ -167,6 +168,25 @@ def load_package(upload):
         raise ValueError("Gebruik JSON of CSV.")
     if "decks" not in data:
         raise ValueError("JSON moet een 'decks' array bevatten.")
+    if not isinstance(data['decks'], list) or not data['decks']:
+        raise ValueError('Het pakket moet minstens één deck bevatten.')
+    names = set()
+    for item in data['decks']:
+        if not isinstance(item, dict) or not isinstance(item.get('name'), str) or not item['name'].strip():
+            raise ValueError('Elk deck moet een naam hebben.')
+        if item['name'] in names:
+            raise ValueError('Decknamen moeten uniek zijn.')
+        names.add(item['name'])
+        if not isinstance(item.get('cards'), list):
+            raise ValueError('Elk deck moet een cards-lijst hebben.')
+        ids = set()
+        for card in item['cards']:
+            if not isinstance(card, dict) or any(not isinstance(card.get(k), str) or not card[k].strip() for k in ('front', 'back')):
+                raise ValueError('Elke kaart moet een niet-lege front en back hebben.')
+            card['id'] = str(card.get('id') or 'user-' + uuid.uuid4().hex)
+            if card['id'] in ids:
+                raise ValueError('Kaart-ID’s moeten uniek zijn binnen een deck.')
+            ids.add(card['id'])
     return data
 
 def save_package(data):
@@ -217,6 +237,11 @@ def default_package():
         }]
         }
     decks_by_name = {d["name"]: d for d in data.get("decks", [])}
+    example_path = Path(__file__).with_name('engels_nederlands_woordjes.csv')
+    if example_path.exists():
+        from vocabulary import load_example_csv
+        example_deck = load_example_csv(example_path)
+        decks_by_name[example_deck['name']] = example_deck
     for row in CONN.execute("SELECT deck_json FROM shared_decks"):
         stored_deck = json.loads(row["deck_json"])
         decks_by_name[stored_deck["name"]] = stored_deck
@@ -227,6 +252,9 @@ if "data" not in st.session_state:
     st.session_state.data = default_package()
 
 st.markdown('<div class="studyflash-title">📚 StudyFlash</div>', unsafe_allow_html=True)
+
+if "pending_deck" in st.session_state:
+    st.session_state.deck = st.session_state.pop("pending_deck")
 
 with st.sidebar:
     st.header("📦 Cursus")
@@ -244,7 +272,7 @@ with st.sidebar:
             try:
                 imported_data = load_package(up)
                 save_shared_package(imported_data)
-                st.session_state.data = imported_data
+                st.session_state.data = default_package()
                 names = [d["name"] for d in imported_data["decks"]]
                 st.session_state.deck = names[0] if names else None
                 st.session_state.last_imported_upload = upload_key
@@ -256,7 +284,7 @@ with st.sidebar:
         st.session_state.deck = st.selectbox("Deck", [d["name"] for d in st.session_state.data["decks"]],
                                              index=[d["name"] for d in st.session_state.data["decks"]].index(deck))
     st.divider()
-    st.download_button("⬇️ Exporteer voortgang/pakket",
+    st.download_button("⬇️ Exporteer studiepakket",
                        save_package(st.session_state.data),
                        file_name="studyflash_package.json",
                        mime="application/json")
@@ -268,7 +296,7 @@ if not deck:
 cards = cards_for(deck)
 ensure_progress(user, deck, cards)
 
-tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Stampen","📖 Samenvatting","✏️ Kaarten","📊 Voortgang"])
+tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Stampen","📖 Samenvatting","✏️ Kaarten","📊 Voortgang","🌍 Woordjes"])
 
 with tabs[0]:
     d = next(x for x in st.session_state.data["decks"] if x["name"] == deck)
@@ -284,17 +312,19 @@ with tabs[0]:
     st.caption("Plan: eerst kaarten met due=today; daarna nieuwe kaarten. Het schema gebruikt een eenvoudige SM-2-achtige herhalingslogica.")
 
 with tabs[1]:
-    hotkeys.activate([
+    enable_hotkeys = st.checkbox("Sneltoetsen inschakelen (uitschakelen bij typen)", value=False)
+    if enable_hotkeys:
+        hotkeys.activate([
         hotkeys.hk("flip", code="Space", prevent_default=True),
         hotkeys.hk("again", code="KeyZ", prevent_default=True),
         hotkeys.hk("hard", code="KeyX", prevent_default=True),
         hotkeys.hk("good", code="KeyC", prevent_default=True),
         hotkeys.hk("easy", code="KeyV", prevent_default=True),
     ], key="learning_keys")
-    flip_pressed = hotkeys.pressed("flip", key="learning_keys")
+    flip_pressed = enable_hotkeys and hotkeys.pressed("flip", key="learning_keys")
     pressed_quality = next((quality for shortcut, quality in
                             [("again", 0), ("hard", 1), ("good", 2), ("easy", 3)]
-                            if hotkeys.pressed(shortcut, key="learning_keys")), None)
+                            if enable_hotkeys and hotkeys.pressed(shortcut, key="learning_keys")), None)
 
     rows = [get_progress(user,deck,str(c["id"])) for c in cards]
     learn_marker = f"{user}:{deck}"
@@ -368,6 +398,7 @@ with tabs[1]:
                 while cid in ids:
                     n += 1
                     cid = f"user-{n}"
+                cid = "user-" + uuid.uuid4().hex
                 new_card = {
                     "id": cid,
                     "front": quick_front.strip(),
@@ -378,6 +409,7 @@ with tabs[1]:
                 cards.append(new_card)
                 ensure_progress(user, deck, [new_card])
                 save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
+                st.session_state.learn_queue.append(cid)
                 st.success("Kaart toegevoegd en ingepland.")
                 st.rerun()
 
@@ -466,6 +498,7 @@ with tabs[4]:
                 while cid in ids:
                     n += 1
                     cid = f"user-{n}"
+                cid = "user-" + uuid.uuid4().hex
                 cards.append({
                     "id": cid,
                     "front": new_front.strip(),
@@ -487,14 +520,19 @@ with tabs[4]:
                 tags = st.text_input("Tags (komma's)", ", ".join(card.get("tags",[])), key=f"t{deck}{idx}")
                 c1, c2 = st.columns(2)
                 if c1.button("Opslaan", key=f"s{deck}{idx}"):
-                    card["front"], card["back"] = f,b
+                    if not f.strip() or not b.strip():
+                        st.error("Vul beide kanten in.")
+                        st.stop()
+                    card["front"], card["back"] = f.strip(),b.strip()
                     card["tags"] = [x.strip() for x in tags.split(",") if x.strip()]
                     save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
                     st.success("Opgeslagen.")
                 if c2.button("🗑️ Verwijderen", key=f"d{deck}{idx}"):
                     cid = str(card["id"])
                     cards.pop(idx)
-                    CONN.execute("DELETE FROM progress WHERE user=? AND deck=? AND card_id=?", (user, deck, cid))
+                    if CONN.execute("SELECT name FROM sqlite_master WHERE name='vocabulary_progress'").fetchone():
+                        CONN.execute("DELETE FROM vocabulary_progress WHERE deck=? AND card_id=?", (deck, cid))
+                    CONN.execute("DELETE FROM progress WHERE deck=? AND card_id=?", (deck, cid))
                     CONN.execute("DELETE FROM stamp_progress WHERE deck=? AND card_id=?", (deck, cid))
                     CONN.commit()
                     save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
@@ -519,3 +557,7 @@ with tabs[5]:
 
 st.divider()
 st.caption("StudyFlash Local is een onafhankelijke hobby-/prototype-app en niet verbonden aan Studyflash GmbH.")
+
+with tabs[6]:
+    from vocabulary_ui import render
+    render(st.session_state.data, deck, user, CONN, save_shared_deck)
