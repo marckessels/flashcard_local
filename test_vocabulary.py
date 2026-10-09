@@ -46,13 +46,15 @@ class VocabularyTests(unittest.TestCase):
                 shutil.copy(root / name, folder / name)
             at = AppTest.from_file(str(folder / 'app.py'), default_timeout=20).run()
             self.assertFalse(at.exception)
-            at.button(key='v_import') # importer is present for regular decks
+            self.assertFalse(any(b.key == 'v_import' for b in at.button))
+            at.radio(key='screen').set_value('🧠 Leren').run()
             # Existing flashcards and review scheduling still work.
             next(b for b in at.button if b.label == 'Toon antwoord').click().run()
             self.assertFalse(at.exception)
             next(b for b in at.button if b.label == 'Good').click().run()
             self.assertFalse(at.exception)
             # Create a vocabulary deck without replacing the study deck.
+            at.radio(key='screen').set_value('🌍 Woordjes').run()
             at.text_input(key='v_name').set_value('Testwoorden')
             at.text_area(key='v_paste').set_value('fiets=bicycle | bike')
             at.button(key='v_import').click().run()
@@ -90,17 +92,49 @@ class VocabularyTests(unittest.TestCase):
             self.assertFalse(fresh.exception)
             self.assertEqual(len(fresh.session_state.data['decks']), 2)
             fresh.selectbox[0].set_value('Testwoorden').run()
+            fresh.radio(key='screen').set_value('✏️ Kaarten').run()
             fresh.text_input(key='new_front').set_value('huis')
             fresh.text_area(key='new_back').set_value('house')
             next(b for b in fresh.button if b.label == 'Kaart toevoegen').click().run()
             self.assertFalse(fresh.exception)
             self.assertEqual(len(fresh.session_state.data['decks'][1]['cards']), 2)
-            fresh.text_input(key='fTestwoorden1').set_value('het huis')
-            fresh.button(key='sTestwoorden1').click().run()
+            cid = fresh.session_state.data['decks'][1]['cards'][1]['id']
+            fresh.selectbox(key='edit_card_Testwoorden').set_value(cid).run()
+            fresh.text_input(key=f'fTestwoorden{cid}').set_value('het huis')
+            fresh.button(key=f'sTestwoorden{cid}').click().run()
             self.assertEqual(fresh.session_state.data['decks'][1]['cards'][1]['front'], 'het huis')
-            fresh.button(key='dTestwoorden1').click().run()
+            fresh.button(key=f'dTestwoorden{cid}').click().run()
             self.assertFalse(fresh.exception)
             self.assertEqual(len(fresh.session_state.data['decks'][1]['cards']), 1)
+
+    def test_large_deck_only_renders_active_screen(self):
+        from streamlit.testing.v1 import AppTest
+        root = Path(__file__).parent
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            folder = Path(folder)
+            for name in ('app.py', 'vocabulary.py', 'vocabulary_ui.py'):
+                shutil.copy(root / name, folder / name)
+            cards = parse_pairs('\n'.join(f'woord{i}=word{i}' for i in range(288)))
+            (folder / 'shared_decks.json').write_text(json.dumps({'decks': [make_deck('Groot', cards)]}), encoding='utf-8')
+            at = AppTest.from_file(str(folder / 'app.py'), default_timeout=20).run()
+            self.assertFalse(at.exception)
+            self.assertFalse(any(x.key == 'new_front' for x in at.text_input))
+            at.radio(key='screen').set_value('🌍 Woordjes').run()
+            at.radio(key='v_mode').set_value('Antwoord typen').run()
+            self.assertFalse(at.exception)
+            self.assertLess(len(at.text_input) + len(at.text_area) + len(at.button), 15)
+            # A vocabulary answer must not touch the regular study tables.
+            statements = []
+            at.session_state.db_connection.set_trace_callback(statements.append)
+            next(x for x in at.text_input if x.label == 'Jouw vertaling').set_value('wrong')
+            next(b for b in at.button if b.label == 'Controleer antwoord').click().run()
+            self.assertFalse(at.exception)
+            self.assertFalse(any('INSERT OR IGNORE INTO progress' in x or 'stamp_progress' in x for x in statements))
+            at.session_state.db_connection.set_trace_callback(None)
+            at.radio(key='screen').set_value('✏️ Kaarten').run()
+            self.assertFalse(at.exception)
+            self.assertEqual(sum(x.label == 'Voorkant' for x in at.text_input), 1)
+            self.assertLess(len(at.text_input) + len(at.text_area) + len(at.button), 15)
 
 
 if __name__ == '__main__':

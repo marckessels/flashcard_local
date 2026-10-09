@@ -5,3 +5,5 @@ Vier geautomatiseerde tests geslaagd op 8 oktober 2026. De integratietest doorlo
 Normalisatie en CSV/JSON/geplakte import zijn afzonderlijk getest, inclusief ongeldige invoer. De tests werken met een tijdelijke database; de oorspronkelijke database wordt niet gewijzigd.
 
 Omgeving: Python 3.12, Streamlit 1.65.0, streamlit-hotkeys 0.6.0. Streamlit meldt de bestaande use_container_width-optie als verouderd; deze werkt in de geteste versie. Geen handmatige browsertest uitgevoerd.
+
+9 oktober 2026: vijf tests geslaagd na de optimalisatie. Extra test met 288 kaarten controleert dat alleen het gekozen scherm wordt opgebouwd, slechts één kaarteditor wordt getoond en woordantwoorden geen reguliere leer-/stampinitialisatie uitvoeren. Antwoordcontrole gebruikt callbacks binnen een Streamlit-fragment. Geen gehoste responstijdmeting uitgevoerd.

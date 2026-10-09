@@ -41,6 +41,11 @@ def render(data, deck, user, conn, save_deck):
                 st.error('Vul beide talen in.')
         return
     st.caption('Woorden toevoegen, wijzigen en verwijderen kan via het tabblad Kaarten. Gebruik | voor alternatieven aan beide kanten.')
+    exercise(current, user, deck, conn)
+
+
+@st.fragment
+def exercise(current, user, deck, conn):
     cards = current['cards']
     languages = (current.get('source_language', 'NL'), current.get('target_language', 'EN'))
     direction = st.radio('Oefenrichting', [0, 1], format_func=lambda n: f'{languages[n]} → {languages[1-n]}', horizontal=True, key='v_direction')
@@ -55,13 +60,11 @@ def render(data, deck, user, conn, save_deck):
     if st.session_state.get('v_marker') != marker:
         queue = [c['id'] for c in cards]
         random.shuffle(queue)
-        st.session_state.update(v_marker=marker, v_queue=queue, v_feedback=None, v_reveal=False, v_turn=0)
+        st.session_state.update(v_marker=marker, v_queue=queue, v_feedback=None, v_reveal=False, v_empty=False, v_turn=0)
     queue = st.session_state.v_queue
     if not queue:
         st.success('Oefenronde afgerond.')
-        if st.button('Nieuwe woordenronde'):
-            st.session_state.v_marker = None
-            st.rerun()
+        st.button('Nieuwe woordenronde', on_click=restart)
     else:
         card = next(c for c in cards if c['id'] == queue[0])
         front, back = ('front', 'back') if direction == 0 else ('back', 'front')
@@ -69,27 +72,21 @@ def render(data, deck, user, conn, save_deck):
         st.subheader(card[front].split('|')[0].strip())
         feedback = st.session_state.v_feedback
         if mode == 'Antwoord typen' and feedback is None:
+            answer_key = f'v_input_{st.session_state.v_turn}'
             with st.form(f'v_answer_{st.session_state.v_turn}'):
-                answer = st.text_input('Jouw vertaling')
-                if st.form_submit_button('Controleer antwoord'):
-                    if not answer.strip():
-                        st.warning('Typ eerst een antwoord.')
-                    else:
-                        correct = matches(answer, card[back], accents)
-                        st.session_state.v_feedback = (correct, answer)
-                        record(conn, user, deck, card['id'], direction, correct)
-                        st.rerun()
+                st.text_input('Jouw vertaling', key=answer_key)
+                st.form_submit_button('Controleer antwoord', on_click=check_answer,
+                                      args=(answer_key, card[back], accents, conn, user, deck, card['id'], direction))
+            if st.session_state.get('v_empty'):
+                st.warning('Typ eerst een antwoord.')
         elif mode == 'Flashcards':
             if not st.session_state.v_reveal:
-                if st.button('Draai woordkaart om'):
-                    st.session_state.v_reveal = True
-                    st.rerun()
+                st.button('Draai woordkaart om', on_click=reveal)
             else:
                 st.info(card[back])
                 for label, correct in [('Juist onthouden', True), ('Nog oefenen', False)]:
-                    if st.button(label):
-                        record(conn, user, deck, card['id'], direction, correct)
-                        advance(queue, correct)
+                    st.button(label, on_click=grade_flashcard,
+                              args=(conn, user, deck, card['id'], direction, correct))
         if feedback is not None:
             correct, answer = feedback
             if correct:
@@ -97,8 +94,7 @@ def render(data, deck, user, conn, save_deck):
             else:
                 st.error(f'Nog oefenen. Jouw antwoord: {answer}')
             st.info('Toegestane antwoorden: ' + card[back])
-            if st.button('Volgend woord'):
-                advance(queue, correct)
+            st.button('Volgend woord', on_click=advance, args=(queue, correct))
     rows = conn.execute('SELECT direction, SUM(attempts), SUM(correct) FROM vocabulary_progress WHERE user=? AND deck=? GROUP BY direction', (user, deck)).fetchall()
     for row in rows:
         st.caption(f'{languages[row[0]]} → {languages[1-row[0]]}: {row[2]} goed van {row[1]} pogingen (alle oefenrondes).')
@@ -116,6 +112,28 @@ def advance(queue, correct):
     cid = queue.pop(0)
     if not correct:
         queue.append(cid)
-    st.session_state.update(v_feedback=None, v_reveal=False, v_turn=st.session_state.v_turn+1)
-    st.rerun()
+    st.session_state.update(v_feedback=None, v_reveal=False, v_empty=False, v_turn=st.session_state.v_turn+1)
 
+
+
+
+def check_answer(key, expected, accents, conn, user, deck, cid, direction):
+    answer = st.session_state.get(key, '')
+    st.session_state.v_empty = not answer.strip()
+    if answer.strip() and st.session_state.v_feedback is None:
+        correct = matches(answer, expected, accents)
+        record(conn, user, deck, cid, direction, correct)
+        st.session_state.v_feedback = (correct, answer)
+
+
+def reveal():
+    st.session_state.v_reveal = True
+
+
+def restart():
+    st.session_state.v_marker = None
+
+
+def grade_flashcard(conn, user, deck, cid, direction, correct):
+    record(conn, user, deck, cid, direction, correct)
+    advance(st.session_state.v_queue, correct)

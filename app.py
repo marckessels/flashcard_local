@@ -85,7 +85,9 @@ def init_db():
     c.commit()
     return c
 
-CONN = init_db()
+if "db_connection" not in st.session_state:
+    st.session_state.db_connection = init_db()
+CONN = st.session_state.db_connection
 
 def ensure_progress(user, deck, cards):
     for card in cards:
@@ -99,6 +101,11 @@ def ensure_progress(user, deck, cards):
 def get_progress(user, deck, cid):
     return CONN.execute("SELECT * FROM progress WHERE user=? AND deck=? AND card_id=?",
                          (user,deck,cid)).fetchone()
+
+def deck_progress(user, deck, cards):
+    by_id = {row['card_id']: row for row in CONN.execute(
+        'SELECT * FROM progress WHERE user=? AND deck=?', (user, deck))}
+    return [by_id[str(card['id'])] for card in cards]
 
 def review(user, deck, card, quality):
     # Lightweight SM-2-style scheduler:
@@ -294,13 +301,13 @@ if not deck:
     st.warning("Geen deck gevonden.")
     st.stop()
 cards = cards_for(deck)
-ensure_progress(user, deck, cards)
+screen = st.radio("Scherm", ["🏠 Overzicht","🧠 Leren","📝 Stampen","📖 Samenvatting","✏️ Kaarten","📊 Voortgang","🌍 Woordjes"], horizontal=True, key="screen")
+if screen in ("🏠 Overzicht", "🧠 Leren", "📊 Voortgang"):
+    ensure_progress(user, deck, cards)
 
-tabs = st.tabs(["🏠 Overzicht","🧠 Leren","📝 Stampen","📖 Samenvatting","✏️ Kaarten","📊 Voortgang","🌍 Woordjes"])
-
-with tabs[0]:
+if screen == "🏠 Overzicht":
     d = next(x for x in st.session_state.data["decks"] if x["name"] == deck)
-    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
+    rows = deck_progress(user, deck, cards)
     due = sum(r["due"] <= date.today().isoformat() for r in rows)
     mastered = sum(r["reps"] >= 4 and r["interval"] >= 14 for r in rows)
     a,b,c = st.columns(3)
@@ -311,7 +318,7 @@ with tabs[0]:
     st.markdown(d.get("summary","Geen samenvatting beschikbaar."))
     st.caption("Plan: eerst kaarten met due=today; daarna nieuwe kaarten. Het schema gebruikt een eenvoudige SM-2-achtige herhalingslogica.")
 
-with tabs[1]:
+if screen == "🧠 Leren":
     enable_hotkeys = st.checkbox("Sneltoetsen inschakelen (uitschakelen bij typen)", value=False)
     if enable_hotkeys:
         hotkeys.activate([
@@ -326,7 +333,7 @@ with tabs[1]:
                             [("again", 0), ("hard", 1), ("good", 2), ("easy", 3)]
                             if enable_hotkeys and hotkeys.pressed(shortcut, key="learning_keys")), None)
 
-    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
+    rows = deck_progress(user, deck, cards)
     learn_marker = f"{user}:{deck}"
     if st.session_state.get("learn_marker") != learn_marker:
         due_ids = [str(c["id"]) for c,r in zip(cards,rows)
@@ -413,7 +420,7 @@ with tabs[1]:
                 st.success("Kaart toegevoegd en ingepland.")
                 st.rerun()
 
-with tabs[2]:
+if screen == "📝 Stampen":
     st.subheader("Stampen")
     ensure_stamp_progress(user, deck, cards)
     stamp_marker = f"{user}:{deck}"
@@ -462,7 +469,7 @@ with tabs[2]:
                 st.session_state.stamp_reveal = False
                 st.rerun()
 
-with tabs[3]:
+if screen == "📖 Samenvatting":
     d = next(x for x in st.session_state.data["decks"] if x["name"] == deck)
     st.subheader("Samenvatting")
     st.markdown(d.get("summary","Geen samenvatting."))
@@ -471,7 +478,7 @@ with tabs[3]:
         for p in d["key_points"]:
             st.markdown(f"- {p}")
 
-with tabs[4]:
+if screen == "✏️ Kaarten":
     st.subheader("Kaarten beheren")
 
     st.markdown("#### Kaartenoverzicht")
@@ -513,21 +520,26 @@ with tabs[4]:
 
     # Edit/delete existing cards
     with st.expander("✏️ Kaarten bewerken of verwijderen"):
-        for idx,card in enumerate(cards):
-            with st.expander(f"{idx+1}. {card['front']}"):
-                f = st.text_input("Voorkant", card["front"], key=f"f{deck}{idx}")
-                b = st.text_area("Achterkant", card["back"], key=f"b{deck}{idx}")
-                tags = st.text_input("Tags (komma's)", ", ".join(card.get("tags",[])), key=f"t{deck}{idx}")
+        if cards:
+            selected_id = st.selectbox("Kies kaart", [str(c["id"]) for c in cards],
+                                       format_func=lambda cid: next(c["front"] for c in cards if str(c["id"]) == cid),
+                                       key=f"edit_card_{deck}")
+            idx = next(i for i, c in enumerate(cards) if str(c["id"]) == selected_id)
+            card = cards[idx]
+            with st.container():
+                f = st.text_input("Voorkant", card["front"], key=f"f{deck}{selected_id}")
+                b = st.text_area("Achterkant", card["back"], key=f"b{deck}{selected_id}")
+                tags = st.text_input("Tags (komma's)", ", ".join(card.get("tags",[])), key=f"t{deck}{selected_id}")
                 c1, c2 = st.columns(2)
-                if c1.button("Opslaan", key=f"s{deck}{idx}"):
+                if c1.button("Opslaan", key=f"s{deck}{selected_id}"):
                     if not f.strip() or not b.strip():
                         st.error("Vul beide kanten in.")
                         st.stop()
                     card["front"], card["back"] = f.strip(),b.strip()
                     card["tags"] = [x.strip() for x in tags.split(",") if x.strip()]
                     save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
-                    st.success("Opgeslagen.")
-                if c2.button("🗑️ Verwijderen", key=f"d{deck}{idx}"):
+                    st.rerun()
+                if c2.button("🗑️ Verwijderen", key=f"d{deck}{selected_id}"):
                     cid = str(card["id"])
                     cards.pop(idx)
                     if CONN.execute("SELECT name FROM sqlite_master WHERE name='vocabulary_progress'").fetchone():
@@ -538,9 +550,9 @@ with tabs[4]:
                     save_shared_deck(next(d for d in st.session_state.data["decks"] if d["name"] == deck))
                     st.rerun()
 
-with tabs[5]:
+if screen == "📊 Voortgang":
     st.subheader("Voortgang")
-    rows = [get_progress(user,deck,str(c["id"])) for c in cards]
+    rows = deck_progress(user, deck, cards)
     if rows:
         mastered = sum(r["reps"] >= 4 and r["interval"] >= 14 for r in rows)
         learning = sum(r["reps"] > 0 and not (r["reps"] >= 4 and r["interval"] >= 14) for r in rows)
@@ -558,6 +570,6 @@ with tabs[5]:
 st.divider()
 st.caption("StudyFlash Local is een onafhankelijke hobby-/prototype-app en niet verbonden aan Studyflash GmbH.")
 
-with tabs[6]:
+if screen == "🌍 Woordjes":
     from vocabulary_ui import render
     render(st.session_state.data, deck, user, CONN, save_shared_deck)

@@ -121,3 +121,9 @@ Daarna kun je ook dubbelklikken op `start_studyflash.bat`. Open http://localhost
 ```
 
 Getest op 8 oktober 2026 met Python 3.12 en Streamlit 1.65.0: CSV/JSON/plakken, invoervalidatie, antwoordnormalisatie en alternatieven, beide richtingen, flashcards, fout-herhaling, eenmalig tellen van feedback, persistente opslag, kaarten toevoegen/bewerken/verwijderen en de bestaande spaced-repetitionbeoordeling. Vier tests geslaagd, waaronder een Streamlit AppTest die de gebruikersstappen doorloopt. Geen volledige handmatige browsertest.
+
+## Snellere bediening (9 oktober 2026)
+
+Kies het gewenste onderdeel via **Scherm** bovenaan. Alleen dat onderdeel wordt uitgevoerd. In **Kaarten** selecteer je één kaart om te bewerken. In **Woordjes** vernieuwen antwoordcontrole en de volgende vraag alleen het oefengedeelte. Leerstatus wordt per deck in één databasevraag opgehaald.
+
+Vijf geautomatiseerde tests slagen, inclusief 288 kaarten: slechts één editor, geen verborgen kaartinvoer op het oefenscherm en geen herinitialisatie van de gewone leer-/stamptabellen bij woordantwoorden. De responstijd van de gehoste app is niet gemeten.
