@@ -60,8 +60,17 @@ def exercise(current, user, deck, conn):
     if st.session_state.get('v_marker') != marker:
         queue = [c['id'] for c in cards]
         random.shuffle(queue)
-        st.session_state.update(v_marker=marker, v_queue=queue, v_feedback=None, v_reveal=False, v_empty=False, v_turn=0)
+        st.session_state.update(v_marker=marker, v_queue=queue, v_feedback=None, v_last_answer=None, v_input='', v_reveal=False, v_empty=False, v_turn=0)
     queue = st.session_state.v_queue
+    previous = st.session_state.get('v_last_answer')
+    if mode == 'Antwoord typen' and previous:
+        correct, answer, prompt, expected = previous
+        message = f"Vorig woord: {prompt} — jouw antwoord: {answer}"
+        if correct:
+            st.success('Goed! ' + message)
+        else:
+            st.error('Nog oefenen. ' + message)
+        st.info('Toegestane antwoorden: ' + expected)
     if not queue:
         st.success('Oefenronde afgerond.')
         st.button('Nieuwe woordenronde', on_click=restart)
@@ -71,12 +80,12 @@ def exercise(current, user, deck, conn):
         st.caption(f'Nog {len(queue)} woorden in deze ronde')
         st.subheader(card[front].split('|')[0].strip())
         feedback = st.session_state.v_feedback
-        if mode == 'Antwoord typen' and feedback is None:
-            answer_key = f'v_input_{st.session_state.v_turn}'
-            with st.form(f'v_answer_{st.session_state.v_turn}'):
+        if mode == 'Antwoord typen':
+            answer_key = 'v_input'
+            with st.form('v_answer', clear_on_submit=True):
                 st.text_input('Jouw vertaling', key=answer_key)
                 st.form_submit_button('Controleer antwoord', on_click=check_answer,
-                                      args=(answer_key, card[back], accents, conn, user, deck, card['id'], direction))
+                                      args=(answer_key, card[back], accents, conn, user, deck, card['id'], direction, card[front], st.session_state.v_turn))
             if st.session_state.get('v_empty'):
                 st.warning('Typ eerst een antwoord.')
         elif mode == 'Flashcards':
@@ -87,14 +96,6 @@ def exercise(current, user, deck, conn):
                 for label, correct in [('Juist onthouden', True), ('Nog oefenen', False)]:
                     st.button(label, on_click=grade_flashcard,
                               args=(conn, user, deck, card['id'], direction, correct))
-        if feedback is not None:
-            correct, answer = feedback
-            if correct:
-                st.success(f'Goed! Jouw antwoord: {answer}')
-            else:
-                st.error(f'Nog oefenen. Jouw antwoord: {answer}')
-            st.info('Toegestane antwoorden: ' + card[back])
-            st.button('Volgend woord', on_click=advance, args=(queue, correct))
     rows = conn.execute('SELECT direction, SUM(attempts), SUM(correct) FROM vocabulary_progress WHERE user=? AND deck=? GROUP BY direction', (user, deck)).fetchall()
     for row in rows:
         st.caption(f'{languages[row[0]]} → {languages[1-row[0]]}: {row[2]} goed van {row[1]} pogingen (alle oefenrondes).')
@@ -117,13 +118,15 @@ def advance(queue, correct):
 
 
 
-def check_answer(key, expected, accents, conn, user, deck, cid, direction):
+def check_answer(key, expected, accents, conn, user, deck, cid, direction, prompt, turn):
     answer = st.session_state.get(key, '')
     st.session_state.v_empty = not answer.strip()
-    if answer.strip() and st.session_state.v_feedback is None:
+    if answer.strip() and turn == st.session_state.v_turn:
         correct = matches(answer, expected, accents)
         record(conn, user, deck, cid, direction, correct)
-        st.session_state.v_feedback = (correct, answer)
+        advance(st.session_state.v_queue, correct)
+        st.session_state.v_last_answer = (correct, answer, prompt, expected)
+        st.session_state[key] = ''
 
 
 def reveal():

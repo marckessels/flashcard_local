@@ -127,3 +127,7 @@ Getest op 8 oktober 2026 met Python 3.12 en Streamlit 1.65.0: CSV/JSON/plakken, 
 Kies het gewenste onderdeel via **Scherm** bovenaan. Alleen dat onderdeel wordt uitgevoerd. In **Kaarten** selecteer je één kaart om te bewerken. In **Woordjes** vernieuwen antwoordcontrole en de volgende vraag alleen het oefengedeelte. Leerstatus wordt per deck in één databasevraag opgehaald.
 
 Vijf geautomatiseerde tests slagen, inclusief 288 kaarten: slechts één editor, geen verborgen kaartinvoer op het oefenscherm en geen herinitialisatie van de gewone leer-/stamptabellen bij woordantwoorden. De responstijd van de gehoste app is niet gemeten.
+
+## Typvragen met Enter
+
+Na het indienen met Enter of Controleer antwoord verschijnt direct het volgende woord. Boven de vraag blijft de uitslag van het vorige antwoord staan, inclusief de toegestane vertalingen. Het antwoordveld wordt leeggemaakt. Een fout woord wordt achteraan de oefenronde geplaatst. Ook bij het afronden van de ronde blijft de laatste uitslag zichtbaar.
