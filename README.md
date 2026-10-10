@@ -131,3 +131,11 @@ Vijf geautomatiseerde tests slagen, inclusief 288 kaarten: slechts één editor,
 ## Typvragen met Enter
 
 Na het indienen met Enter of Controleer antwoord verschijnt direct het volgende woord. Boven de vraag blijft de uitslag van het vorige antwoord staan, inclusief de toegestane vertalingen. Het antwoordveld wordt leeggemaakt. Een fout woord wordt achteraan de oefenronde geplaatst. Ook bij het afronden van de ronde blijft de laatste uitslag zichtbaar.
+
+## Antwoord toch goed rekenen en oefenronde hervatten
+
+Bij de uitslag van een fout typantwoord staat **Toch goed rekenen**. Hiermee corrigeer je die poging naar goed, zonder extra poging, en verdwijnt het woord uit de herhaalronde. Dit geldt alleen voor die beoordeling; toegestane vertalingen kun je blijvend wijzigen via Kaarten.
+
+Oefenrondes worden automatisch opgeslagen per gebruiker, deck, richting en oefenvorm. Als een opgeslagen ronde beschikbaar is, kies je **Verdergaan met vorige sessie** of **Helemaal opnieuw beginnen**. Ook tijdens het oefenen kun je opnieuw beginnen. Dat start een ronde met alle woorden; de historische pogingentelling blijft behouden. Gebruik bij hervatten dezelfde gebruikersnaam.
+
+De opslag zit in de lokale SQLite-database. In Streamlit Cloud kan deze verdwijnen bij herdeploy of vervanging van de server; hervatten werkt zolang die database behouden blijft. Voortgang van vóór deze uitbreiding bevat geen opgeslagen woordvolgorde en kan daarom niet als ronde worden hervat.

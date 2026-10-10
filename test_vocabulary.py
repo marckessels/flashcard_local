@@ -124,6 +124,7 @@ class VocabularyTests(unittest.TestCase):
             at.radio(key='v_mode').set_value('Antwoord typen').run()
             self.assertFalse(at.exception)
             self.assertLess(len(at.text_input) + len(at.text_area) + len(at.button), 15)
+
             # A vocabulary answer must not touch the regular study tables.
             statements = []
             at.session_state.db_connection.set_trace_callback(statements.append)
@@ -136,6 +137,43 @@ class VocabularyTests(unittest.TestCase):
             self.assertFalse(at.exception)
             self.assertEqual(sum(x.label == 'Voorkant' for x in at.text_input), 1)
             self.assertLess(len(at.text_input) + len(at.text_area) + len(at.button), 15)
+
+    def test_override_resume_and_restart(self):
+        from streamlit.testing.v1 import AppTest
+        root = Path(__file__).parent
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            folder = Path(folder)
+            for name in ('app.py', 'vocabulary.py', 'vocabulary_ui.py'):
+                shutil.copy(root / name, folder / name)
+            cards = parse_pairs('fiets=bike\nhuis=house')
+            (folder / 'shared_decks.json').write_text(json.dumps({'decks': [make_deck('Woorden', cards)]}), encoding='utf-8')
+            at = AppTest.from_file(str(folder / 'app.py'), default_timeout=20).run()
+            at.radio(key='screen').set_value('🌍 Woordjes').run()
+            at.radio(key='v_mode').set_value('Antwoord typen').run()
+            at.text_input(key='v_input').set_value('andere juiste vertaling')
+            next(b for b in at.button if b.label == 'Controleer antwoord').click().run()
+            cid = at.session_state.v_last_cid
+            at.button(key='v_override').click().run()
+            self.assertFalse(at.exception)
+            self.assertNotIn(cid, at.session_state.v_queue)
+            self.assertEqual(len(at.session_state.v_queue), 1)
+            self.assertTrue(at.session_state.v_last_answer[0])
+            at.run()
+            row = at.session_state.db_connection.execute('SELECT attempts,correct FROM vocabulary_progress WHERE card_id=?', (cid,)).fetchone()
+            self.assertEqual(tuple(row), (1, 1))
+            remaining = list(at.session_state.v_queue)
+            fresh = AppTest.from_file(str(folder / 'app.py'), default_timeout=20).run()
+            fresh.radio(key='screen').set_value('🌍 Woordjes').run()
+            fresh.radio(key='v_mode').set_value('Antwoord typen').run()
+            self.assertFalse(any(x.label == 'Jouw vertaling' for x in fresh.text_input))
+            fresh.button(key='v_resume').click().run()
+            self.assertFalse(fresh.exception)
+            self.assertEqual(fresh.session_state.v_queue, remaining)
+            self.assertTrue(fresh.session_state.v_last_answer[0])
+            fresh.button(key='v_start_over').click().run()
+            self.assertFalse(fresh.exception)
+            self.assertEqual(len(fresh.session_state.v_queue), 2)
+            self.assertIsNone(fresh.session_state.v_last_answer)
 
 
 if __name__ == '__main__':
