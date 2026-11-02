@@ -32,6 +32,47 @@
         {"id": "cep6-023", "front": "vincere", "back": "(over)winnen", "tags": ["Latijn"]},
         {"id": "cep6-024", "front": "vita", "back": "(het) leven", "tags": ["Latijn"]}
       ]
+    },
+    {
+      "name": "Duits - Lektion 3",
+      "kind": "vocabulary",
+      "source_language": "NL",
+      "target_language": "DE",
+      "description": "Woordenlijst",
+      "summary": "",
+      "cards": [
+        {"id": "duits-l3-001", "front": "de mentor", "back": "der Klassenlehrer, die Klassenlehrer", "tags": [], "source": "user"},
+        {"id": "duits-l3-002", "front": "de mentrix", "back": "die Klassenlehrerin, die Klassenlehrerinnen", "tags": [], "source": "user"},
+        {"id": "duits-l3-003", "front": "het lievelingsvak", "back": "das Lieblingsfach, die Lieblingsfächer", "tags": [], "source": "user"},
+        {"id": "duits-l3-004", "front": "het cijfer", "back": "die Note, die Noten", "tags": [], "source": "user"},
+        {"id": "duits-l3-005", "front": "scheikunde", "back": "Chemie", "tags": [], "source": "user"},
+        {"id": "duits-l3-006", "front": "Duits", "back": "Deutsch", "tags": [], "source": "user"},
+        {"id": "duits-l3-007", "front": "Engels", "back": "Englisch", "tags": [], "source": "user"},
+        {"id": "duits-l3-008", "front": "aardrijkskunde", "back": "Erdkunde", "tags": [], "source": "user"},
+        {"id": "duits-l3-009", "front": "Frans", "back": "Französisch", "tags": [], "source": "user"},
+        {"id": "duits-l3-010", "front": "geschiedenis", "back": "Geschichte", "tags": [], "source": "user"},
+        {"id": "duits-l3-011", "front": "Grieks", "back": "Griechisch", "tags": [], "source": "user"},
+        {"id": "duits-l3-012", "front": "Latijn", "back": "Latein", "tags": [], "source": "user"},
+        {"id": "duits-l3-013", "front": "wiskunde", "back": "Mathematik", "tags": [], "source": "user"},
+        {"id": "duits-l3-014", "front": "natuurkunde", "back": "Physik", "tags": [], "source": "user"},
+        {"id": "duits-l3-015", "front": "godsdienst", "back": "Religion", "tags": [], "source": "user"},
+        {"id": "duits-l3-016", "front": "lichamelijke opvoeding | LO", "back": "Sport", "tags": [], "source": "user"},
+        {"id": "duits-l3-017", "front": "het potlood", "back": "der Bleistift, die Bleistifte", "tags": [], "source": "user"},
+        {"id": "duits-l3-018", "front": "het boek", "back": "das Buch, die Bücher", "tags": [], "source": "user"},
+        {"id": "duits-l3-019", "front": "de etui", "back": "das Etui, die Etuis", "tags": [], "source": "user"},
+        {"id": "duits-l3-020", "front": "het schrift", "back": "das Heft, die Hefte", "tags": [], "source": "user"},
+        {"id": "duits-l3-021", "front": "de (bal)pen", "back": "der Kugelschreiber, die Kugelschreiber", "tags": [], "source": "user"},
+        {"id": "duits-l3-022", "front": "de rugzak", "back": "der Rucksack, die Rucksäcke", "tags": [], "source": "user"},
+        {"id": "duits-l3-023", "front": "de schaar", "back": "die Schere, die Scheren", "tags": [], "source": "user"},
+        {"id": "duits-l3-024", "front": "de tas", "back": "die Tasche, die Taschen", "tags": [], "source": "user"},
+        {"id": "duits-l3-025", "front": "vermoeiend", "back": "anstrengend", "tags": [], "source": "user"},
+        {"id": "duits-l3-026", "front": "stom", "back": "blöd", "tags": [], "source": "user"},
+        {"id": "duits-l3-027", "front": "makkelijk", "back": "einfach", "tags": [], "source": "user"},
+        {"id": "duits-l3-028", "front": "vriendelijk", "back": "freundlich", "tags": [], "source": "user"},
+        {"id": "duits-l3-029", "front": "saai", "back": "langweilig", "tags": [], "source": "user"},
+        {"id": "duits-l3-030", "front": "aardig", "back": "nett", "tags": [], "source": "user"},
+        {"id": "duits-l3-031", "front": "moeilijk", "back": "schwierig", "tags": [], "source": "user"}
+      ]
     }
   ]
 }
