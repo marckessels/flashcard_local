@@ -73,6 +73,36 @@
         {"id": "duits-l3-030", "front": "aardig", "back": "nett", "tags": [], "source": "user"},
         {"id": "duits-l3-031", "front": "moeilijk", "back": "schwierig", "tags": [], "source": "user"}
       ]
+    },
+    {
+      "name": "Duits - Lektion 6",
+      "kind": "vocabulary",
+      "source_language": "NL",
+      "target_language": "DE",
+      "description": "Woordenlijst",
+      "summary": "",
+      "cards": [
+        {"id": "duits-l6-001", "front": "de werkkamer", "back": "das Arbeitszimmer, die Arbeitszimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-002", "front": "de badkamer", "back": "das Badezimmer, die Badezimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-003", "front": "de zolder", "back": "der Dachboden, die Dachböden", "tags": [], "source": "user"},
+        {"id": "duits-l6-004", "front": "de eetkamer", "back": "das Esszimmer, die Esszimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-005", "front": "de hal", "back": "der Flur, die Flure", "tags": [], "source": "user"},
+        {"id": "duits-l6-006", "front": "de tuin", "back": "der Garten, die Gärten", "tags": [], "source": "user"},
+        {"id": "duits-l6-007", "front": "de kinderkamer", "back": "das Kinderzimmer, die Kinderzimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-008", "front": "de keuken", "back": "die Küche, die Küchen", "tags": [], "source": "user"},
+        {"id": "duits-l6-009", "front": "de wc", "back": "die Toilette, die Toiletten", "tags": [], "source": "user"},
+        {"id": "duits-l6-010", "front": "de slaapkamer", "back": "das Schlafzimmer, die Schlafzimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-011", "front": "de woonkamer", "back": "das Wohnzimmer, die Wohnzimmer", "tags": [], "source": "user"},
+        {"id": "duits-l6-012", "front": "de boerderij", "back": "der Bauernhof, die Bauernhöfe", "tags": [], "source": "user"},
+        {"id": "duits-l6-013", "front": "het vrijstaande huis", "back": "das Einfamilienhaus, die Einfamilienhäuser", "tags": [], "source": "user"},
+        {"id": "duits-l6-014", "front": "het flatgebouw", "back": "das Hochhaus, die Hochhäuser", "tags": [], "source": "user"},
+        {"id": "duits-l6-015", "front": "het appartementencomplex", "back": "das Mehrfamilienhaus, die Mehrfamilienhäuser", "tags": [], "source": "user"},
+        {"id": "duits-l6-016", "front": "het rijtjeshuis", "back": "das Reihenhaus, die Reihenhäuser", "tags": [], "source": "user"},
+        {"id": "duits-l6-017", "front": "het appartement", "back": "die Wohnung, die Wohnungen", "tags": [], "source": "user"},
+        {"id": "duits-l6-018", "front": "het huisdier", "back": "das Haustier, die Haustiere", "tags": [], "source": "user"},
+        {"id": "duits-l6-019", "front": "de hond", "back": "der Hund, die Hunde", "tags": [], "source": "user"},
+        {"id": "duits-l6-020", "front": "de kat", "back": "die Katze, die Katzen", "tags": [], "source": "user"}
+      ]
     }
   ]
 }
