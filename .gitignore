@@ -7,3 +7,6 @@ __pycache__/
 *.db-shm
 backup_before_*/
 work/
+
+# Local Remote Control launcher (machine-specific)
+start_remote_control.bat
