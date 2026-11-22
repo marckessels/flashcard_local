@@ -52,15 +52,14 @@ code NIET. Het script hieronder doet het werk en de validatie.
    je NIET met deze skill (de database gaat voor op het JSON-bestand); meld
    dat aan de gebruiker.
 
-5. **Test**:
+5. **Test** met de projectomgeving:
 
    ```
-   python -m unittest discover -s . -p "test_*.py"
+   .venv/Scripts/python.exe -m unittest discover -s . -p "test_*.py"
    ```
-   Bekend: als de enige fouten `No module named 'streamlit_hotkeys'` (of een
-   andere ontbrekende module) zijn, ligt dat aan de Python-omgeving, niet aan
-   het deck. Ga dan door en noem het kort in je eindbericht. Andere fouten:
-   stoppen en melden, niet committen.
+   Bestaat `.venv` niet (bv. in een cloudsessie), gebruik dan `python` en
+   installeer eerst `python -m pip install -r requirements.txt`. Falen er
+   tests: stoppen en melden, niet committen.
 
 6. **Commit** (alleen `shared_decks.json`, niet pushen):
 
