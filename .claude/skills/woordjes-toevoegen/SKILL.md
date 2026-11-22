@@ -1,7 +1,7 @@
 ---
 name: woordjes-toevoegen
 description: Voeg een woordenlijst (meestal foto's vanaf de telefoon) toe als nieuw vocabulary-deck in shared_decks.json, test en commit. Gebruik bij "/woordjes-toevoegen <decknaam>" of als de gebruiker foto's van woordjes stuurt om toe te voegen.
-argument-hint: <decknaam, bv. "Duits - Lektion 7">
+argument-hint: <decknaam> [— opmerkingen, bv. "alleen de gemarkeerde woorden"]
 ---
 
 # Woordenlijst toevoegen
@@ -9,10 +9,27 @@ argument-hint: <decknaam, bv. "Duits - Lektion 7">
 Doel: zo weinig mogelijk tokens. Lees `shared_decks.json`, `app.py` of andere
 code NIET. Het script hieronder doet het werk en de validatie.
 
+## Opmerkingen van de gebruiker gaan voor
+
+Splits de invoer in **decknaam** en **opmerkingen**:
+- Decknaam = alleen het eerste deel van het argument (tot een `—`, `-` gevolgd
+  door een opmerking, `,`, `:`, `(` of het einde van de eerste regel).
+  Voorbeeld: `Duits - Lektion 7 — alleen de gemarkeerde woorden` → naam
+  `Duits - Lektion 7`. Let op: het streepje in `Duits - Lektion 7` hoort bij
+  de naam.
+- Opmerkingen = de rest van het argument plus alle tekst in het bericht.
+
+Opmerkingen gaan altijd voor op de standaardregels hieronder: welke woorden
+(alleen gemarkeerd/omcirkeld, alleen linkerkolom, bepaalde nummers of
+pagina's, zinnen overslaan), richting van front/back, taal, enz. Is een
+opmerking onduidelijk voor de foto (bv. geen markering te zien)? Niet gokken:
+stop en vraag het na vóór je iets toevoegt.
+
 ## Stappen
 
-1. **Lees de foto('s)** die de gebruiker meestuurde. Neem elk woordpaar over
-   precies zoals het er staat (spelling, lidwoorden, meervouden, accenten).
+1. **Lees de foto('s)** die de gebruiker meestuurde. Neem de woordparen over
+   die volgens de opmerkingen meedoen (zonder opmerkingen: alle woordparen),
+   precies zoals ze er staan (spelling, lidwoorden, meervouden, accenten).
    - `front` = Nederlands, `back` = de vreemde taal (zoals in de bestaande decks),
      tenzij de gebruiker iets anders zegt.
    - Meerdere goede antwoorden/varianten: scheid met ` | `
@@ -69,5 +86,7 @@ code NIET. Het script hieronder doet het werk en de validatie.
    ```
 
 7. **Eindbericht** (kort, Nederlands): decknaam, aantal woorden, eventuele
-   twijfelgevallen. Vermeld dat het deck verschijnt na het (her)starten of
+   twijfelgevallen. Heb je door een opmerking woorden overgeslagen, zeg dan
+   hoeveel en welk soort (bv. "18 niet-gemarkeerde woorden overgeslagen"), zodat
+   de gebruiker de selectie kan controleren. Vermeld dat het deck verschijnt na het (her)starten of
    verversen van de app.
