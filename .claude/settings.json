@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Write(/work/**)",
+      "Edit(/work/**)",
+      "Bash(python .claude/skills/woordjes-toevoegen/add_deck.py:*)",
+      "Bash(python -m unittest:*)",
+      "Bash(git add shared_decks.json)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "PowerShell(python .claude/skills/woordjes-toevoegen/add_deck.py:*)",
+      "PowerShell(python -m unittest:*)",
+      "PowerShell(git add shared_decks.json)",
+      "PowerShell(git commit:*)",
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)"
+    ]
+  }
+}
