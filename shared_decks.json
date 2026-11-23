@@ -243,8 +243,8 @@
     {
       "name": "bergenzee",
       "kind": "vocabulary",
-      "source_language": "NL",
-      "target_language": "NL",
+      "source_language": "Betekenis",
+      "target_language": "Begrip",
       "description": "Woordenlijst",
       "summary": "42 gemarkeerde aardrijkskundebegrippen (Finish, p. 32-33): omschrijving -> begrip.",
       "cards": [
